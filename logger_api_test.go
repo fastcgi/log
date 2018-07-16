@@ -1928,3 +1928,117 @@ func TestLogger_LeveledPrint(t *testing.T) {
 		}
 	}
 }
+
+func TestLogger_WithTraceID(t *testing.T) {
+	lg := _New(nil)
+	
+	var buf bytes.Buffer
+	lg.SetOutput(ConcurrentWriter(&buf))
+	lg.SetFormatter(testJsonFormatter{})
+	
+	// none trace id
+	{
+		lg.Info("info-msg")
+		
+		data := buf.Bytes()
+		var have map[string]interface{}
+		if err := json.Unmarshal(data, &have); err != nil {
+			t.Error(err.Error())
+			return
+		}
+		
+		want := map[string]interface{}{
+			fieldKeyTraceId: "",
+			fieldKeyLevel:   InfoLevelString,
+			fieldKeyMessage: "info-msg",
+		}
+		if !reflect.DeepEqual(have, want) {
+			t.Errorf("\nhave:%v\nwant:%v", have, want)
+			return
+		}
+	}
+	
+	buf.Reset()
+	
+	// WithTraceID
+	{
+		traceID := "28ad28a9889a11e8bf137200052be2b0"
+		lg.WithTraceID(traceID)
+		lg.Info("info-msg")
+		
+		data := buf.Bytes()
+		var have map[string]interface{}
+		if err := json.Unmarshal(data, &have); err != nil {
+			t.Error(err.Error())
+			return
+		}
+		
+		want := map[string]interface{}{
+			fieldKeyTraceId: traceID,
+			fieldKeyLevel:   InfoLevelString,
+			fieldKeyMessage: "info-msg",
+		}
+		if !reflect.DeepEqual(have, want) {
+			t.Errorf("\nhave:%v\nwant:%v", have, want)
+			return
+		}
+	}
+	
+	buf.Reset()
+	
+	// WithTraceIDFunc  and  inherit the fields
+	{
+		newLogger := lg.WithFields("field1-key", "field1-value", "field2-key", "field2-value")
+		lg.WithTraceID("")
+		newLogger.Info("info-msg", )
+		
+		data := buf.Bytes()
+		var have map[string]interface{}
+		if err := json.Unmarshal(data, &have); err != nil {
+			t.Error(err.Error())
+			return
+		}
+		
+		want := map[string]interface{}{
+			fieldKeyTraceId: "",
+			fieldKeyLevel:   InfoLevelString,
+			fieldKeyMessage: "info-msg",
+			"field1-key":    "field1-value",
+			"field2-key":    "field2-value",
+		}
+		if !reflect.DeepEqual(have, want) {
+			t.Errorf("\nhave:%v\nwant:%v", have, want)
+			return
+		}
+		
+		buf.Reset()
+		
+		traceID := "28ad28a9889a11e8bf137200052be2b0"
+		traceIDFn := func() string {
+			// func to generate trace id
+			return traceID
+		}
+		newLogger.WithTraceIDFunc(traceIDFn)
+		newLogger.Info("info-msg", "field2-key", "field2-new-value", "field3-key", "field3-value", )
+		
+		data = buf.Bytes()
+		if err := json.Unmarshal(data, &have); err != nil {
+			t.Error(err.Error())
+			return
+		}
+		
+		want = map[string]interface{}{
+			fieldKeyTraceId: traceID,
+			fieldKeyLevel:   InfoLevelString,
+			fieldKeyMessage: "info-msg",
+			"field1-key":    "field1-value",
+			"field2-key":    "field2-new-value",
+			"field3-key":    "field3-value",
+		}
+		if !reflect.DeepEqual(have, want) {
+			t.Errorf("\nhave:%v\nwant:%v", have, want)
+			return
+		}
+		
+	}
+}

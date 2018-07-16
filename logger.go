@@ -51,6 +51,12 @@ type Logger interface {
 	// WithFields creates a new Logger from the current Logger and adds multiple fields to it.
 	// The requirements for fields can see the comments of Fatal.
 	WithFields(fields ...interface{}) Logger
+	
+	// WithTraceID creates a new Logger from the current Logger and set the logger traceID
+	WithTraceID(traceID string) Logger
+	
+	// WithTraceIDFunc creates a new Logger from the current Logger and set the logger traceID by func
+	WithTraceIDFunc(fn func() string) Logger
 
 	// SetFormatter sets the logger formatter.
 	SetFormatter(Formatter)
@@ -245,4 +251,29 @@ func (l *logger) WithFields(fields ...interface{}) Logger {
 	}
 	nl.setOptions(l.getOptions())
 	return nl
+}
+
+func (l *logger) cloneWithTraceID(opts *options) Logger {
+	nl := &logger{
+		fields: l.fields,
+	}
+	nl.setOptions(opts)
+	
+	return nl
+}
+
+func (l *logger) WithTraceID(traceID string) Logger {
+	opt := l.getOptions()
+	opt.traceId = traceID
+	return l.cloneWithTraceID(opt)
+}
+
+func (l *logger) WithTraceIDFunc(fn func() string) Logger {
+	if fn == nil {
+		return l
+	}
+	
+	opt := l.getOptions()
+	opt.traceId = fn()
+	return l.cloneWithTraceID(opt)
 }
